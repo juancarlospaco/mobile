@@ -18,7 +18,7 @@
 
 # metadata
 " Ninja Mobile Util "
-__version__ = ' 0.1 '
+__version__ = ' 0.4 '
 __license__ = ' GPL '
 __author__ = ' juancarlospaco '
 __email__ = ' juancarlospaco@ubuntu.com '
@@ -44,9 +44,9 @@ from PyQt4.QtGui import (QLabel, QCompleter, QDirModel, QPushButton, QWidget,
 from PyQt4.QtCore import Qt, QDir, QProcess
 
 try:
-    from PyKDE4.kdeui import KTextEdit as QPlainTextEdit
+    from PyKDE4.kdeui import KTextEdit as QTextEdit
 except ImportError:
-    from PyQt4.QtGui import QPlainTextEdit  # lint:ok
+    from PyQt4.QtGui import QTextEdit  # lint:ok
 
 from ninja_ide.gui.explorer.explorer_container import ExplorerContainer
 from ninja_ide.core import plugin
@@ -64,6 +64,7 @@ HELPMSG = '''
 This is a Mobile tool for Ninja aimed at HTML5/CSS3/JS.
 <ul>
 <li>Mozilla killed Fennec on x86 (at version >13)
+<li>Qt Mobile Emulators are dead (at this time)
 <li>Chromium Mobile Emulators cant run stand-alone
 <li>The only tool where Opera Mobile Emulator
 <li>Default Opera Launcher dont allow Local files
@@ -82,7 +83,6 @@ class Main(plugin.Plugin):
     " Main Class "
     def initialize(self, *args, **kwargs):
         " Init Main Class "
-        ec = ExplorerContainer()
         super(Main, self).initialize(*args, **kwargs)
         self.process = QProcess()
         self.process.readyReadStandardOutput.connect(self.readOutput)
@@ -90,8 +90,7 @@ class Main(plugin.Plugin):
         self.process.finished.connect(self._process_finished)
         self.process.error.connect(self._process_finished)
         # directory auto completer
-        self.completer = QCompleter(self)
-        self.dirs = QDirModel(self)
+        self.completer, self.dirs = QCompleter(self), QDirModel(self)
         self.dirs.setFilter(QDir.AllEntries | QDir.NoDotAndDotDot)
         self.completer.setModel(self.dirs)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
@@ -99,10 +98,9 @@ class Main(plugin.Plugin):
 
         self.group0 = QGroupBox()
         self.group0.setTitle(' Source ')
-        self.source = QComboBox()
+        self.source, self.infile = QComboBox(), QLineEdit(path.expanduser("~"))
         self.source.addItems(['Local File', 'Remote URL'])
         self.source.currentIndexChanged.connect(self.on_source_changed)
-        self.infile = QLineEdit(path.expanduser("~"))
         self.infile.setPlaceholderText(' /full/path/to/file.html ')
         self.infile.setCompleter(self.completer)
         self.open = QPushButton(QIcon.fromTheme("folder-open"), 'Open')
@@ -111,10 +109,9 @@ class Main(plugin.Plugin):
             QFileDialog.getOpenFileName(self.dock, "Open a File to read from",
             path.expanduser("~"), ';;'.join(['{}(*.{})'.format(e.upper(), e)
             for e in ['html', 'webp', 'webm', 'svg', 'css', 'js', '*']])))))
-        self.inurl = QLineEdit('http://www.')
+        self.inurl, self.output = QLineEdit('http://www.'), QTextEdit()
         self.inurl.setPlaceholderText('http://www.full/url/to/remote/file.html')
         self.inurl.hide()
-        self.output = QPlainTextEdit()
         vboxg0 = QVBoxLayout(self.group0)
         for each_widget in (self.source, self.infile, self.open, self.inurl):
             vboxg0.addWidget(each_widget)
@@ -174,11 +171,10 @@ class Main(plugin.Plugin):
 
         self.group2 = QGroupBox()
         self.group2.setTitle(' General ')
-        self.nice = QSpinBox()
+        self.nice, self.opera = QSpinBox(), QLineEdit(path.expanduser("~"))
         self.nice.setValue(20)
         self.nice.setMaximum(20)
         self.nice.setMinimum(0)
-        self.opera = QLineEdit(path.expanduser("~"))
         self.opera.setCompleter(self.completer)
         if path.exists(CONFIG_FILE):
             with codecs.open(CONFIG_FILE, encoding='utf-8') as fp:
@@ -222,14 +218,13 @@ class Main(plugin.Plugin):
 
         tw = TransientWidget((QLabel('<b>Mobile Browser Emulator'),
             self.group0, self.group1, self.group2, self.output, self.button, ))
-        self.scrollable = QScrollArea()
+        self.scrollable, self.dock = QScrollArea(), QDockWidget()
         self.scrollable.setWidgetResizable(True)
         self.scrollable.setWidget(tw)
-        self.dock = QDockWidget()
         self.dock.setWindowTitle(__doc__)
         self.dock.setStyleSheet('QDockWidget::title{text-align: center;}')
         self.dock.setWidget(self.scrollable)
-        ec.addTab(self.dock, "Mobile")
+        ExplorerContainer().addTab(self.dock, "Mobile")
         QPushButton(QIcon.fromTheme("help-about"), 'About', self.dock
           ).clicked.connect(lambda: QMessageBox.information(self.dock, __doc__,
             HELPMSG))
